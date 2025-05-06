@@ -11,91 +11,90 @@ from random import *
 #below value should be 0 (CPU @ ~20%) or 1 (CPU quiet, slows payoff)
 processingLevel = 0
 
-#below value is too high? pays too often? probably should be set by server
-target = 3000000000000000000000000000000000000000000000
+target = 3000000000000000000000000000000000000000000000  #just for testing
 #targetDigest = 00045a5623a9ad5c610e2c7dfb024fa8a798f52d
+#targetDigest = 00000042e58e31cd58e2fa8cb55cfa0f9f0d51f5
 
-class phoneHome():
-        heartbeat = 30
-        jitter = 15
-        
-        def __init__(self):
-                super().__init__()
-                
-        def callHome(self, checkpoint, minerID):
-                r = requests.get('http://localhost:8888/beta?mid={}'.format(minerID))
-                if r.status_code != 200: raise ValueError(r.text)
-                p = json.loads(r.text)
-                phoneHome.heartbeat = p["h"]
-                phoneHome.jitter = p["j"]
-                print('Heartbeat updated: {}, {}'.format(phoneHome.heartbeat, phoneHome.jitter))
+class PhoneHome():
+    heartbeat = 30
+    jitter = 15
+    home_url = 'http://localhost:8888/kk'
+    # home_url = 'http://192.168.37.129:8888/kk'
 
-        def callCoin(self, coinResult, minerID):
-                payload = { 'kk' : coinResult, 'mid' : minerID }
-                r = requests.post('http://localhost:8888/beta', data=payload)
-                print(r.text)
+    def __init__(self):
+        super().__init__()
 
-        def newTime(self):
-                current_time = datetime.datetime.now()
-                #add or subtract jitter based on current time
-                if current_time.microsecond % 2 == 0:   
-                        offset = phoneHome.heartbeat - randint(0, phoneHome.jitter)
-                else: 
-                        offset = phoneHome.heartbeat + randint(0, phoneHome.jitter)
-                #use offset to establish next check in
-                return_time = (current_time + datetime.timedelta(seconds = offset))
-                return (return_time)
+    def CallHome(self, MinerID):    #heartbeat check-in with C2
+        payload = { 'c' : "BCH", 'm' : MinerID }
+        r = requests.get(self.home_url, data=payload)
+        if r.status_code != 200: raise ValueError(r.text)
+        p = json.loads(r.text)
+        PhoneHome.heartbeat = p["h"]
+        PhoneHome.jitter = p["j"]
 
-class coin():
-        def __init__(self):
-                super().__init__()
-                
-        def mine(self):
-                allchar = string.ascii_letters + string.punctuation + string.digits
-                miningSeed = "".join(choice(allchar) for x in range(randint(1, 20)))
-                miningDigest=hashlib.sha1((miningSeed).encode('utf-8'))
-                time.sleep(processingLevel)
-                return (miningDigest)
+    def CallCoin(self, CoinResult, MinerID):    #send a coin result to bank
+        payload = { 'c' : "CCH", 'm' : MinerID, 'k' : CoinResult }
+        r = requests.get(self.home_url, data=payload)
 
-        def compare(self, target, miningDigest):
-                coinTry=int(miningDigest.hexdigest(),miningDigest.digest_size)
-                if coinTry < target:
-                        result = 1
-                else:
-                        result = 0
-                return (result)
+    def NewTime(self):    #get the next C2 check-in time
+        current_time = datetime.datetime.now()
+        #add or subtract jitter
+        seed = randint(0,1)
+        if seed == 0:
+            offset = PhoneHome.heartbeat - randint(0, PhoneHome.jitter)
+        else:
+            offset = PhoneHome.heartbeat + randint(0, PhoneHome.jitter)
+        #use offset to establish next check in
+        return_time = (current_time + datetime.timedelta(seconds = offset))
+        return (return_time)
+
+class Coin():
+    def __init__(self):
+        super().__init__()
+
+    def Mine(self):    #generate a random string and get its hash digest
+        allchar = string.ascii_letters + string.punctuation + string.digits
+        miningSeed = "".join(choice(allchar) for x in range(randint(1, 20)))
+        miningDigest=hashlib.sha1((miningSeed).encode('utf-8'))
+        time.sleep(processingLevel)
+        return (miningDigest)
+
+    def Compare(self, target, miningDigest):    #compare mining try to reference value
+        CoinTry=int(miningDigest.hexdigest(),miningDigest.digest_size)
+        if CoinTry < target:
+            result = 1
+        else:
+            result = 0
+        return (result)
 
 
 def main():
-        getNewParams = 1
-        app=phoneHome()
-        mine=coin()
-        minerID = uuid.uuid4().hex
-        
-        while True:
-                try:
-                        checkpoint = datetime.datetime.now()
+    GetNewParams = 1
+    app=PhoneHome()
+    Mine=Coin()
+    MinerID = uuid.uuid4().hex
 
-                        if getNewParams == 1:
-                                check_in = app.newTime()
-                                getNewParams = 0
-                                app.callHome(checkpoint, minerID)
-                                
-                        if checkpoint > check_in:
-                                getNewParams = 1
-                        else:
-                                coinResult = mine.mine()
-                        
-                                if mine.compare(target,coinResult) == 1:
-                                    app.callCoin(coinResult.hexdigest(),minerID)
-                        
-                except (KeyboardInterrupt):                     #REMOVE IN FINAL
-                        break                                   #REMOVE IN FINAL
-                except Exception as e:
-                        logging.exception(e)
-                        print (e)                               #REMOVE IN FINAL
-                        continue
+    while True:
+        try:
+            checkpoint = datetime.datetime.now()
+
+            if GetNewParams == 1:
+                check_in = app.NewTime()
+                GetNewParams = 0
+                app.CallHome(MinerID)
+
+            if checkpoint > check_in:
+                GetNewParams = 1
+            else:
+                CoinResult = Mine.Mine()
+
+            if Mine.Compare(target,CoinResult) == 1:
+                app.CallCoin(CoinResult.hexdigest(),MinerID)
+
+        except (KeyboardInterrupt):                 #REMOVE IN FINAL
+            break                                   #REMOVE IN FINAL
+        except:
+            continue
 
 if __name__ == "__main__":
-        main()
-
+    main()
