@@ -92,4 +92,7 @@ Desktop.ini
 # IDEs
 .idea/
 *.sublime-project
-*.sublime-workspace
+*.sublime-workspaceblacblackk
+
+#KrasKoins db
+kraskoins.db
