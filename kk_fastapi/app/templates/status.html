@@ -1,0 +1,96 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <meta charset="UTF-8" />
+    <meta http-equiv="refresh" content="15" />
+    <title>Status Dashboard</title>
+
+    <!-- Libraries -->
+    <script src="https://ajax.googleapis.com/ajax/libs/jquery/3.4.0/jquery.min.js"></script>
+    <script src="https://unpkg.com/tabulator-tables@4.2.5/dist/js/tabulator.min.js"></script>
+    <script src="https://momentjs.com/downloads/moment.js"></script>
+    <link
+      href="https://unpkg.com/tabulator-tables@4.2.5/dist/css/tabulator.min.css"
+      rel="stylesheet"
+    />
+  </head>
+  <body>
+    <h2>Beacon Dashboard</h2>
+
+    <div class="table-controls">
+      <button id="del-row">Delete selected row</button>
+    </div>
+
+    <div id="beacontable"></div>
+
+    <script>
+      function cellEdited(cell) {
+        const d = cell.getRow().getData();
+        fetch(`/kk/status/${d.uuid}`, {
+          method: "PUT",
+          headers: {
+            "Content-Type": "application/json"
+          },
+          body: JSON.stringify({
+            uuid: d.uuid,
+            h: d.heartbeat,
+            j: d.jitter
+          })
+        })
+      }
+
+      function onLoad() {
+        const tabledata = [
+          {% for beacon in beacons %}
+          {
+            ip: "{{ beacon.ip }}",
+            uuid: "{{ beacon.mid }}",
+            heartbeat: {{ beacon.heartbeat }},
+            jitter: {{ beacon.jitter }},
+            lci: "{{ beacon.lastCheckIn }}",
+            nci: "{{ beacon.nextCheckIn }}"
+          },
+          {% endfor %}
+        ];
+
+        const table = new Tabulator("#beacontable", {
+          data: tabledata,
+          layout: "fitColumns",
+          selectable: 1,
+          cellEdited: cellEdited,
+          columns: [
+            {title: "IP", field: "ip"},
+            {title: "UUID", field: "uuid"},
+            {title: "Heartbeat", field: "heartbeat", editor: "number"},
+            {title: "Jitter", field: "jitter", editor: "number"},
+            {title: "Last Check-in", field: "lci", formatter: "datetime", formatterParams: {
+              outputFormat: "YYYY-MM-DD HH:mm:ss"
+            }},
+            {title: "Next Check-in", field: "nci", formatter: function(cell) {
+              return moment(cell.getValue()).fromNow();
+            }}
+          ]
+        });
+
+        $("#del-row").click(function() {
+          const selectedRows = table.getSelectedRows();
+          selectedRows.forEach(function(row) {
+            const d = row.getData();
+            row.delete();
+            fetch(`/kk/status/${d.uuid}`, {
+              method: "DELETE",
+              headers: {
+                "Content-Type": "application/json"
+              },
+            })
+            .then(response => response.json())
+            .then(data => console.log("Delete response:", data))
+            .catch(error => console.error("Delete error:", error));
+          });
+        });
+      }
+
+      document.addEventListener("DOMContentLoaded", onLoad);
+    </script>
+  </body>
+</html>
