@@ -16,13 +16,7 @@ RUN apt-get update && apt-get install -y \
 
 # Install Python dependencies
 COPY requirements.txt .
-RUN pip install --upgrade pip && pip install -r requirements.txt
+
 
 # Copy the entire app
 COPY . .
-
-# Expose the port FastAPI will run on
-EXPOSE 443
-
-# Start the FastAPI app using uvicorn
-CMD ["uvicorn", "app.main:app", "--host", "104.53.222.47", "--port", "443", "--ssl-keyfile", "watchdog.key", "--ssl-certfile", "watchdog.crt"]

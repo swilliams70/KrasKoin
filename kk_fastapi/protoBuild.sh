@@ -1,10 +1,8 @@
 #!/bin/bash
 
 # Variables
-IMAGE_NAME="watchdog"
-CONTAINER_NAME="watchdog"
-PORT=443
-HOST="104.53.222.47"
+IMAGE_NAME="watchdawgz.proto"
+CONTAINER_NAME="watchdawgz.proto"
 
 # Step 1: Build the Docker image
 echo "🔨 Building Docker image..."
