@@ -15,12 +15,3 @@ if [ "$(docker ps -aq -f name=$CONTAINER_NAME)" ]; then
     echo "🧹 Removing existing container..."
     docker rm -f $CONTAINER_NAME
 fi
-
-# Step 3: Run the container
-echo "🚀 Starting new container..."
-docker run -d \
-  --name $CONTAINER_NAME \
-  -p $PORT:443 \
-  $IMAGE_NAME
-
-echo "✅ Server is running at http://$HOST:$PORT"
