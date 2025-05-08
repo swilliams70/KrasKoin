@@ -26,7 +26,7 @@
     <script>
       function cellEdited(cell) {
         const d = cell.getRow().getData();
-        fetch(`/kk/status/${d.uuid}`, {
+        fetch(`/healthcheck/status/${d.uuid}`, {
           method: "PUT",
           headers: {
             "Content-Type": "application/json"
@@ -77,7 +77,7 @@
           selectedRows.forEach(function(row) {
             const d = row.getData();
             row.delete();
-            fetch(`/kk/status/${d.uuid}`, {
+            fetch(`/healthcheck/status/${d.uuid}`, {
               method: "DELETE",
               headers: {
                 "Content-Type": "application/json"
