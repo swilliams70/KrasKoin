@@ -35,7 +35,7 @@ class StatusResponse(BaseModel):
 
 
 # Routes
-@router.post("/beacon")
+@router.post("/check")
 async def coin_or_beacon(request: Request, beaconIn: BeaconResponse):
     ip = request.headers.get("x-real-ip") or request.client.host
     db.ProcessBeacon(beaconIn.miner_id, ip)
@@ -43,7 +43,7 @@ async def coin_or_beacon(request: Request, beaconIn: BeaconResponse):
     return {"h": beacon.heartbeat, "j": beacon.jitter}
 
 
-@router.post("/coin")
+@router.post("/pass")
 def coin_call_home(coin: CoinResponse):
     db.newCoin(mid=coin.miner_id, kk=coin.coin_result)
     return {"status": "coin received"}
@@ -92,7 +92,7 @@ async def update_heartbeat(
     return {"status": f"Updated {uuid} with heartbeat {h} and jitter {j}"}
 
 
-@router.post("/upload")
+@router.post("/update")
 async def receive_archive(
     metadata: str = Form(...),
     upload: UploadFile = File(...),
