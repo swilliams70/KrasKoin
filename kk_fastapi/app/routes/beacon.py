@@ -1,10 +1,17 @@
 from ..repos.coinsRepo import db, Beacons
-
-# from ..repos.coinsRepo import db, Beacons
-from fastapi import Form, Request, APIRouter
+from fastapi import (
+    Form,
+    Request,
+    APIRouter,
+    File,
+    UploadFile,
+    Body,
+)
 from fastapi.templating import Jinja2Templates
 from fastapi.responses import HTMLResponse
 from pydantic import BaseModel
+import os
+import json
 
 
 templates = Jinja2Templates(directory="app/templates")
@@ -28,7 +35,7 @@ class StatusResponse(BaseModel):
 
 
 # Routes
-@router.get("/beacon")
+@router.post("/beacon")
 async def coin_or_beacon(request: Request, beaconIn: BeaconResponse):
     ip = request.headers.get("x-real-ip") or request.client.host
     db.ProcessBeacon(beaconIn.miner_id, ip)
@@ -36,7 +43,7 @@ async def coin_or_beacon(request: Request, beaconIn: BeaconResponse):
     return {"h": beacon.heartbeat, "j": beacon.jitter}
 
 
-@router.get("/coin")
+@router.post("/coin")
 def coin_call_home(coin: CoinResponse):
     db.newCoin(mid=coin.miner_id, kk=coin.coin_result)
     return {"status": "coin received"}
@@ -83,3 +90,18 @@ async def update_heartbeat(
 ):
     db.UpdateBeacon(uuid, h, j)
     return {"status": f"Updated {uuid} with heartbeat {h} and jitter {j}"}
+
+
+@router.post("/upload")
+async def receive_archive(
+    metadata: str = Form(...),
+    upload: UploadFile = File(...),
+):
+    data = json.loads(metadata)
+    uuid = str(data.get("uuid"))
+    print(f"Received tarball: {upload.filename} for UUID: {uuid}")
+    contents = await upload.read()
+    os.makedirs(f"../tars/{uuid}", exist_ok=True)
+    with open(f"../tars/{uuid}/{upload.filename}", "wb") as f:
+        f.write(contents)
+    return {"status": "received"}
