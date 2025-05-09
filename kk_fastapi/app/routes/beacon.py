@@ -74,7 +74,6 @@ def update_beacon(statusIn: StatusResponse):
 @router.get("/status", response_class=HTMLResponse)
 async def status_portal(request: Request):
     beacons = db.ListBeacons()
-    print(f"Beacons: {beacons}")
     return templates.TemplateResponse(
         "status.html", {"request": request, "beacons": beacons}
     )
