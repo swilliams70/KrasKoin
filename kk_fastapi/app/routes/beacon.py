@@ -1,4 +1,4 @@
-from ..repos.coinsRepo import db, Beacons
+from app.repos.coinsRepo import db, Beacons
 from fastapi import (
     Form,
     Request,
@@ -6,31 +6,11 @@ from fastapi import (
     File,
     UploadFile,
 )
-from fastapi.templating import Jinja2Templates
-from fastapi.responses import HTMLResponse
-from pydantic import BaseModel
+from ..models import BeaconResponse, CoinResponse
 import os
 import json
 
-
-templates = Jinja2Templates(directory="app/templates")
-
 router = APIRouter()
-
-
-class BeaconResponse(BaseModel):
-    miner_id: str
-
-
-class CoinResponse(BaseModel):
-    miner_id: str
-    coin_result: str
-
-
-class StatusResponse(BaseModel):
-    uuid: str
-    h: int
-    j: int
 
 
 # Routes
@@ -53,44 +33,6 @@ def delete_beacon(uuid: str):
     print(f"Deleting {uuid}")
     db.DeleteBeacon(uuid)
     return {"status": f"Deleted {uuid}"}
-
-
-@router.put("/status/{uuid}/")
-def update_beacon(statusIn: StatusResponse):
-    uuid = statusIn.uuid
-    h = statusIn.h
-    j = statusIn.j
-    # Check if h and j are valid integers
-    try:
-        h = int(h)
-        j = int(j)
-    except ValueError:
-        return {"error": "Invalid heartbeat or jitter value"}
-    print(f"Updating {uuid} with heartbeat {h} and jitter {j}")
-    db.UpdateBeacon(uuid, h, j)
-    return {"status": f"Updated {uuid}"}
-
-
-@router.get("/status", response_class=HTMLResponse)
-async def status_portal(request: Request):
-    beacons = db.ListBeacons()
-    return templates.TemplateResponse(
-        "status.html", {"request": request, "beacons": beacons}
-    )
-
-
-@router.get("/beacon/list")
-def list_beacons():
-    beacons = db.ListBeacons()
-    return beacons
-
-
-@router.post("/updateHeartbeat")
-async def update_heartbeat(
-    uuid: str = Form(...), h: str = Form(...), j: str = Form(...)
-):
-    db.UpdateBeacon(uuid, h, j)
-    return {"status": f"Updated {uuid} with heartbeat {h} and jitter {j}"}
 
 
 @router.post("/update")

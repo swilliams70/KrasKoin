@@ -20,4 +20,7 @@ RUN pip install --upgrade pip && pip install -r requirements.txt
 
 
 # Copy the entire app
-COPY . .
+COPY /app/repos /app/repos
+COPY /app/routes /app/routes
+COPY /app/templates /app/templates
+COPY /app/main.py /app/main.py
