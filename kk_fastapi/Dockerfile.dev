@@ -21,3 +21,9 @@ RUN pip install --upgrade pip && pip install -r requirements.txt
 
 # Copy the entire app
 COPY . .
+
+# Expose the port FastAPI will run on
+EXPOSE 8443
+
+# Start the FastAPI app using uvicorn
+CMD ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8443", "--reload"]

@@ -5,7 +5,6 @@ from fastapi import (
     APIRouter,
     File,
     UploadFile,
-    Body,
 )
 from fastapi.templating import Jinja2Templates
 from fastapi.responses import HTMLResponse
@@ -51,6 +50,7 @@ def coin_call_home(coin: CoinResponse):
 
 @router.delete("/status/{uuid}/")
 def delete_beacon(uuid: str):
+    print(f"Deleting {uuid}")
     db.DeleteBeacon(uuid)
     return {"status": f"Deleted {uuid}"}
 
@@ -66,6 +66,7 @@ def update_beacon(statusIn: StatusResponse):
         j = int(j)
     except ValueError:
         return {"error": "Invalid heartbeat or jitter value"}
+    print(f"Updating {uuid} with heartbeat {h} and jitter {j}")
     db.UpdateBeacon(uuid, h, j)
     return {"status": f"Updated {uuid}"}
 
@@ -101,7 +102,9 @@ async def receive_archive(
     uuid = str(data.get("uuid"))
     print(f"Received tarball: {upload.filename} for UUID: {uuid}")
     contents = await upload.read()
-    os.makedirs(f"../tars/{uuid}", exist_ok=True)
-    with open(f"../tars/{uuid}/{upload.filename}", "wb") as f:
+    os.makedirs(f"/app/app/data/tars/{uuid}", exist_ok=True)
+    # Save the uploaded file
+
+    with open(f"/app/app/data/tars/{uuid}/{upload.filename}", "wb") as f:
         f.write(contents)
     return {"status": "received"}
