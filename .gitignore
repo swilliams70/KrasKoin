@@ -95,6 +95,8 @@ Desktop.ini
 *.sublime-workspaceblacblackk
 
 #KrasKoins db
-kraskoins.db
 
-tars/*
+kraskoins.db
+**/*.gz
+**/tars/*
+*.tar

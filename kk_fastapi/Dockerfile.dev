@@ -18,7 +18,6 @@ RUN apt-get update && apt-get install -y \
 COPY requirements.txt .
 RUN pip install --upgrade pip && pip install -r requirements.txt
 
-COPY watchdog.key watchdog.crt ./
 
 # Copy the entire app
 COPY . .
@@ -27,4 +26,4 @@ COPY . .
 EXPOSE 8443
 
 # Start the FastAPI app using uvicorn
-CMD ["uvicorn", "app.main:app", "--host", "localhost", "--port", "8443", "--ssl-keyfile", "watchdog.key", "--ssl-certfile", "watchdog.crt"]
+CMD ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8443", "--reload"]

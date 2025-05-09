@@ -19,7 +19,9 @@ fi
 echo "🚀 Starting new container..."
 docker run -d \
   --name $CONTAINER_NAME \
+  -v "$(pwd)/app/data:/app/app/data" \
+  -v "$(pwd)/app/data/tars:/app/app/data/tars" \
   -p $PORT:8443 \
   $IMAGE_NAME
 
-echo "✅ Server is running at https://localhost:$PORT"
+echo "✅ Server is running at http://localhost:$PORT"

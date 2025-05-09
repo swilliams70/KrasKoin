@@ -90,5 +90,5 @@ class dbMethods:
 
 
 # App init
-db = dbMethods("sqlite:///kraskoins.db")
+db = dbMethods("sqlite:///app/data/kraskoins.db")
 db.create()

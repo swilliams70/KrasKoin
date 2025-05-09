@@ -1,0 +1,8 @@
+FROM watchdawgz.proto
+
+COPY watchdawgz.crt ./
+COPY watchdawgz.key ./
+
+EXPOSE 433
+
+CMD ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "433", "--ssl-keyfile", "watchdawgz.key", "--ssl-certfile", "watchdawgz.crt"]

