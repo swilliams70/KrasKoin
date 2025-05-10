@@ -275,6 +275,12 @@ def main():
         for t in threads:
             t.join(timeout=5)  # optional timeout
         logger.info("[+] All threads shut down cleanly.")
+    except SystemExit as e:
+        logger.info("[!] System exit signal received.")
+        stop_event.set()
+        for t in threads:
+            t.join(timeout=5)
+        logger.info("[+] All threads shut down cleanly.")
 
 
 if __name__ == "__main__":
