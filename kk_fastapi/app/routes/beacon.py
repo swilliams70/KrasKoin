@@ -9,6 +9,7 @@ from fastapi import (
 from ..models import BeaconResponse, CoinResponse
 import os
 import json
+from fastapi.responses import RedirectResponse
 
 router = APIRouter()
 
@@ -25,7 +26,18 @@ async def coin_or_beacon(request: Request, beaconIn: BeaconResponse):
 @router.post("/pass")
 def coin_call_home(coin: CoinResponse):
     db.newCoin(mid=coin.mid, kk=coin.kk)
-    return {"status": "coin received"}
+    beacon = db.session.query(Beacons).filter_by(mid=coin.mid).one()
+    if beacon.kill:
+        print(f"Beacon {coin.mid} has been killed.")
+        return {"kill": True}
+    else:
+        return {"kill": False}
+
+@router.delete("/kill/{uuid}/")
+def kill_beacon(uuid: str):
+    print(f"Killing {uuid}")
+    db.killBeacon(uuid)
+    return {"status": f"Killed {uuid}"}
 
 
 @router.delete("/status/{uuid}/")

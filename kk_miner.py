@@ -80,7 +80,7 @@ class PhoneHome:
                 )
             r.raise_for_status()
             p = r.json()
-            if p['kill']:
+            if p.get('kill', False):
                 self.kill = True
                 logger.info("[!] Received kill signal from server.")
                 sys.exit(0)

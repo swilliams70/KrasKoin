@@ -125,6 +125,26 @@
               });
           });
       });
+
+      function killMiner(minerId) {
+        fetch(`/healthcheck/kill/${minerId}/`, {
+          method: "DELETE",
+          headers: {
+            "Content-Type": "application/json",
+          },
+        })
+          .then((res) => {
+            if (!res.ok) throw new Error("Kill failed");
+            return res.json();
+          })
+          .then((data) => {
+            console.log("Killed:", data);
+          })
+          .catch((err) => {
+            console.error("Error killing miner:", err);
+            alert("Kill failed");
+          });
+      }
     </script>
   </head>
   <body>
@@ -139,7 +159,8 @@
           <th>Heartbeat</th>
           <th>Jitter</th>
           <th>Last Check-In</th>
-          <th>Next Check-In</th>
+          <th>Left For Dead</th>
+          <th>Actions</th>
         </tr>
       </thead>
       <tbody>
@@ -150,7 +171,10 @@
           <td>{{ beacon.heartbeat }}</td>
           <td>{{ beacon.jitter }}</td>
           <td>{{ beacon.lastCheckIn }}</td>
-          <td>{{ beacon.nextCheckIn }}</td>
+          <td>{{ beacon.kill }}</td>
+          <td>
+            <button onclick="killMiner('{{ beacon.mid }}')">Kill</button>
+          </td>
         </tr>
         {% endfor %}
       </tbody>
