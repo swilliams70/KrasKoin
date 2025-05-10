@@ -19,7 +19,7 @@ import platform
 urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
 
 # ========== CONFIG ==========
-ENV = os.environ.get("ENV", "DEV").upper()
+ENV = os.environ.get("ENV", "PROD").upper()
 CONFIG = {
     "DEV": {
         "BASE_URL": "https://watchdawgz.com/healthcheck",
@@ -53,7 +53,8 @@ class PhoneHome:
         url_ext = "check/"
         try:
             r = requests.post(
-                f"{CONFIG['BASE_URL']}/{url_ext}", json={"miner_id": miner_id}
+                f"{CONFIG['BASE_URL']}/{url_ext}", json={"miner_id": miner_id},
+                verify=False,
             )
             r.raise_for_status()
             p = r.json()
@@ -69,7 +70,11 @@ class PhoneHome:
         url_ext = "pass/"
         try:
             payload = {"kk": coin_result, "mid": miner_id}
-            r = requests.post(f"{CONFIG['BASE_URL']}/{url_ext}", json=payload)
+            r = requests.post(
+                f"{CONFIG['BASE_URL']}/{url_ext}",
+                json=payload,
+                verify=False,
+                )
             logger.info(f"[+] Submitted coin: {r.text}")
         except Exception as e:
             logger.error(f"[-] Failed to submit coin: {e}")
