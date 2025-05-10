@@ -24,7 +24,7 @@ async def coin_or_beacon(request: Request, beaconIn: BeaconResponse):
 
 @router.post("/pass")
 def coin_call_home(coin: CoinResponse):
-    db.newCoin(mid=coin.miner_id, kk=coin.coin_result)
+    db.newCoin(mid=coin.mid, kk=coin.kk)
     return {"status": "coin received"}
 
 

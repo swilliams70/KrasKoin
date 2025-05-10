@@ -25,7 +25,7 @@ def login(
 ):
     if user_repo.verify_user(username, password):
         request.session["user"] = username
-        return RedirectResponse("/info/tasks", status_code=302)
+        return RedirectResponse("/info/status", status_code=302)
     return templates.TemplateResponse(
         "login.html", {"request": request, "error": "Invalid credentials"}
     )

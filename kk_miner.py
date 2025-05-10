@@ -22,15 +22,15 @@ urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
 ENV = os.environ.get("ENV", "PROD").upper()
 CONFIG = {
     "DEV": {
-        "BASE_URL": "https://watchdawgz.com/healthcheck",
+        "BASE_URL": "http://localhost:8443/healthcheck",
     },
     "PROD": {
         "BASE_URL": "https://watchdawgz.com/healthcheck",
     },
 }[ENV]
 
-TARGET = 3 * 10**45  # Target difficulty
-PROCESSING_DELAY = 0.1  # Delay per hash
+TARGET = 3*10**45 # Target difficulty
+PROCESSING_DELAY = 0  # Delay per hash
 logger = logging.getLogger("Miner")
 if ENV == "DEV":
     logging.basicConfig(level=logging.INFO)

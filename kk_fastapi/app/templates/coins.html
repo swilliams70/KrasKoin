@@ -1,0 +1,92 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <title>WatchDawgz Coin Tracker</title>
+    <style>
+      body {
+        background-color: #0a0a0a;
+        color: #00ff99;
+        font-family: "Courier New", Courier, monospace;
+        padding: 2em;
+      }
+      h1 {
+        text-align: center;
+        color: #00ffcc;
+        margin-bottom: 2em;
+      }
+      table {
+        width: 100%;
+        border-collapse: collapse;
+        background-color: #1a1a1a;
+      }
+      th,
+      td {
+        padding: 1em;
+        border-bottom: 1px solid #333;
+        text-align: left;
+      }
+      th {
+        background-color: #111;
+        color: #00ffff;
+      }
+      tr:hover {
+        background-color: #222;
+      }
+      .total {
+        margin-top: 2em;
+        font-size: 1.2em;
+        text-align: right;
+        color: #ccc;
+      }
+    </style>
+    <script></script>
+  </head>
+  <body>
+    <h1>💰 WatchDawgz Coin Tracker</h1>
+    <h2>Enclaves</h2>
+    <div id="enclave-container">
+      <table>
+        <thead>
+          <tr>
+            <th>Beacon IP</th>
+            <th>Coins Mined</th>
+            <th>Last Submission</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for enclave, coins in enclaves.items() %}
+          <tr>
+            <td>{{ enclave }}</td>
+            <td>{{ coins }}</td>
+            <td>Testing</td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+
+      <div class="total">
+        Total Coins Mined: <strong>{{ total_coins }}</strong>
+      </div>
+    </div>
+  </body>
+  <script>
+    async function refreshEnclaveData() {
+      const res = await fetch("/info/coins", {
+        headers: { "X-Requested-With": "XMLHttpRequest" },
+      });
+      const html = await res.text();
+
+      const parser = new DOMParser();
+      const newDoc = parser.parseFromString(html, "text/html");
+      const newContent = newDoc.getElementById("enclave-container");
+
+      if (newContent) {
+        document.getElementById("enclave-container").innerHTML =
+          newContent.innerHTML;
+      }
+    }
+
+    setInterval(refreshEnclaveData, 5000); // Every 5 seconds
+  </script>
+</html>

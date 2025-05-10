@@ -11,7 +11,13 @@ templates = Jinja2Templates(directory="app/templates")
 router = APIRouter()
 
 @router.get("/status", response_class=HTMLResponse)
+
 async def status_portal(request: Request):
+    if not request.session.get("user"):
+        return HTMLResponse(
+            content="Unauthorized access. Please log in.",
+            status_code=401,
+        )
     beacons = db.ListBeacons()
     return templates.TemplateResponse(
         "status.html", {"request": request, "beacons": beacons}
@@ -33,8 +39,25 @@ def update_beacon(statusIn: StatusResponse):
     return {"status": f"Updated {uuid}"}
 
 
+@router.get("/coins", response_class=HTMLResponse)
+def info(request: Request):
+    if not request.session.get("user"):
+        return HTMLResponse(
+            content="Unauthorized access. Please log in.",
+            status_code=401,
+        )
+    enclaves = db.get_coins_by_enclave() or {}
+    total_coins = sum(enclaves.values())
 
-@router.get("/beacon/list")
-def list_beacons():
-    beacons = db.ListBeacons()
-    return beacons
+    if request.headers.get("x-requested-with") == "XMLHttpRequest":
+        return templates.TemplateResponse("coins_fragment.html", {"request": request, "enclaves": enclaves, "total_coins": total_coins})
+
+
+    return templates.TemplateResponse(
+        "coins.html",
+        {
+            "request": request,
+            "enclaves": enclaves,
+            "total_coins": total_coins,
+        },
+    )

@@ -88,6 +88,26 @@ class dbMethods:
             self.session.commit()
             print(f"Coin received from {mid}")
 
+    def get_coins_by_enclave(self):
+        coins = self.session.query(Coins).all()
+        enclaves = {}
+        for coin in coins:
+            ip = (
+                self.session.query(Beacons)
+                .filter_by(mid=coin.miner)
+                .one()
+                .ip
+            )
+            if not ip:
+                continue
+            if ip not in enclaves:
+                enclaves[ip] = []
+            enclaves[ip].append(coin.kk)
+        for ip in enclaves.keys():
+            enclaves[ip] = len(set(enclaves[ip]))
+        return enclaves
+
+
 
 # App init
 db = dbMethods("sqlite:///app/data/kraskoins.db")

@@ -5,8 +5,8 @@ class BeaconResponse(BaseModel):
 
 
 class CoinResponse(BaseModel):
-    miner_id: str
-    coin_result: str
+    mid: str
+    kk: str
 
 
 class StatusResponse(BaseModel):
